@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FinTrack - Vibrant Personal Finance & Wealth Manager</title>
+    <meta name="description" content="FinTrack is a modern, responsive personal finance and wealth management dashboard with analytics, transaction tracking, and investment portfolios.">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💰</text></svg>">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Glass Effect */
+        .glass {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* Smooth Animations & Elevation */
+        .hover-lift {
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @media (hover: hover) {
+            .hover-lift:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 16px 30px -10px rgba(99, 102, 241, 0.18);
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #6366f1, #a855f7); border-radius: 9999px; }
+        
+        /* Gradient Headers */
+        .header-income { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; }
+        .header-expense { background: linear-gradient(135deg, #e11d48 0%, #f43f5e 100%); color: white; }
+
+        /* Toast notifications */
+        #toastContainer {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            left: 16px;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        @media (min-width: 640px) {
+            #toastContainer {
+                left: auto;
+                max-width: 400px;
+            }
+        }
+        .toast-item {
+            pointer-events: auto;
+            transform: translateY(-20px);
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        }
+        .toast-item.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* Mobile drawer animation */
+        #mobileDrawer {
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col selection:bg-indigo-200 selection:text-indigo-900 antialiased">
+
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer"></div>
+
+    <!-- AUTHENTICATION VIEW -->
+    <div id="authSection" class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-[url('https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop')] bg-cover bg-center">
+        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md"></div>
+        
+        <div class="relative glass my-auto p-6 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md border border-white/60">
+            <div class="text-center mb-6 sm:mb-8">
+                <div class="inline-flex p-3.5 sm:p-4 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 shadow-xl shadow-indigo-500/25 mb-3 sm:mb-4">
+                    <i class="fas fa-chart-pie text-3xl sm:text-4xl text-white"></i>
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">FinTrack</h1>
+                <p class="text-indigo-600 font-semibold text-xs sm:text-sm mt-1">Smart Money & Wealth Manager</p>
+            </div>
+
+            <!-- Login Form -->
+            <div id="loginForm">
+                <form onsubmit="event.preventDefault(); handleLogin();" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Username</label>
+                        <div class="flex items-center border-2 border-slate-200 rounded-xl bg-white px-3.5 py-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-200 transition">
+                            <i class="fas fa-user text-slate-400 mr-3 text-sm"></i>
+                            <input type="text" id="loginUser" class="bg-transparent w-full outline-none font-semibold text-slate-700 text-base sm:text-sm" placeholder="Enter username" value="admin" required autocomplete="username">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Password</label>
+                        <div class="flex items-center border-2 border-slate-200 rounded-xl bg-white px-3.5 py-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-200 transition">
+                            <i class="fas fa-lock text-slate-400 mr-3 text-sm"></i>
+                            <input type="password" id="loginPass" class="bg-transparent w-full outline-none font-semibold text-slate-700 text-base sm:text-sm" placeholder="Enter password" value="admin123" required autocomplete="current-password">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 active:scale-[0.98] transition transform text-sm sm:text-base">
+                        <i class="fas fa-arrow-right-to-bracket mr-2"></i> SIGN IN
+                    </button>
+                </form>
+
+                <div class="mt-6 flex flex-col items-center gap-3">
+                    <p class="text-center text-xs sm:text-sm text-slate-600">
+                        New user? <button type="button" onclick="toggleAuth('register')" class="text-indigo-600 font-bold hover:underline">Create Account</button>
+                    </p>
+                    <button type="button" onclick="quickFillAdmin()" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-full text-xs font-mono font-medium border border-indigo-200/60 transition flex items-center gap-1.5 active:scale-95">
+                        <i class="fas fa-bolt text-amber-500"></i> Quick Demo Login: admin / admin123
+                    </button>
+                </div>
+            </div>
+
+            <!-- Register Form -->
+            <div id="registerForm" class="hidden">
+                <form onsubmit="event.preventDefault(); handleRegister();" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">New Username</label>
+                        <div class="flex items-center border-2 border-slate-200 rounded-xl bg-white px-3.5 py-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-200 transition">
+                            <i class="fas fa-user-plus text-slate-400 mr-3 text-sm"></i>
+                            <input type="text" id="regUser" placeholder="Choose a username" class="bg-transparent w-full outline-none font-semibold text-slate-700 text-base sm:text-sm" required autocomplete="username">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">New Password</label>
+                        <div class="flex items-center border-2 border-slate-200 rounded-xl bg-white px-3.5 py-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-200 transition">
+                            <i class="fas fa-lock text-slate-400 mr-3 text-sm"></i>
+                            <input type="password" id="regPass" placeholder="Choose a secure password" class="bg-transparent w-full outline-none font-semibold text-slate-700 text-base sm:text-sm" required autocomplete="new-password">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/30 active:scale-[0.98] transition transform text-sm sm:text-base">
+                        <i class="fas fa-user-check mr-2"></i> CREATE ACCOUNT
+                    </button>
+                </form>
+                <p class="mt-6 text-center text-xs sm:text-sm text-slate-600">
+                    Already have an account? <button type="button" onclick="toggleAuth('login')" class="text-indigo-600 font-bold hover:underline">Login here</button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP DASHBOARD -->
+    <div id="dashboardSection" class="hidden flex-1 flex flex-col md:flex-row h-screen overflow-hidden bg-slate-50">
+        
+        <!-- Mobile Sidebar Backdrop -->
+        <div id="mobileDrawerBackdrop" onclick="toggleMobileDrawer(false)" class="fixed inset-0 bg-slate-950/60 z-30 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+        <!-- Sidebar (Desktop Fixed / Mobile Slide-over Drawer) -->
+        <aside id="mobileDrawer" class="fixed md:static inset-y-0 left-0 z-40 w-72 bg-slate-900 text-white flex flex-col shadow-2xl -translate-x-full md:translate-x-0 transition-transform duration-300 ease-out flex-shrink-0">
+            <!-- Glow Accent -->
+            <div class="absolute -top-12 -right-12 w-44 h-44 bg-indigo-500 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
+            <div class="absolute -bottom-10 -left-10 w-44 h-44 bg-purple-500 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
+            
+            <div class="p-5 sm:p-6 border-b border-slate-800/80 z-10 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                        <i class="fas fa-wallet text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-100 to-purple-200 tracking-tight">FinTrack</h2>
+                        <span class="text-[10px] text-indigo-400 font-semibold uppercase tracking-wider block">Smart Finance</span>
+                    </div>
+                </div>
+                <!-- Close Button (Mobile Only) -->
+                <button onclick="toggleMobileDrawer(false)" class="md:hidden text-slate-400 hover:text-white p-2 text-lg">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-1 px-4 py-6 space-y-2 z-10 overflow-y-auto">
+                <button id="nav-btn-analytics" onclick="switchTab('analytics')" class="nav-btn w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 flex items-center text-white bg-indigo-600 shadow-lg shadow-indigo-900/40 group">
+                    <div class="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center mr-3 group-hover:bg-white/30 transition">
+                        <i class="fas fa-chart-line text-sm"></i>
+                    </div>
+                    <span class="font-semibold text-sm">Analytics & Charts</span>
+                </button>
+                
+                <button id="nav-btn-salary" onclick="switchTab('salary')" class="nav-btn w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 flex items-center text-slate-300 hover:bg-slate-800/70 hover:text-white group">
+                    <div class="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center mr-3 group-hover:bg-emerald-500 group-hover:text-white transition">
+                        <i class="fas fa-exchange-alt text-sm"></i>
+                    </div>
+                    <span class="font-semibold text-sm">Transactions & Flow</span>
+                </button>
+                
+                <button id="nav-btn-investments" onclick="switchTab('investments')" class="nav-btn w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 flex items-center text-slate-300 hover:bg-slate-800/70 hover:text-white group">
+                    <div class="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center mr-3 group-hover:bg-fuchsia-500 group-hover:text-white transition">
+                        <i class="fas fa-rocket text-sm"></i>
+                    </div>
+                    <span class="font-semibold text-sm">Investments & ROI</span>
+                </button>
+                
+                <button id="adminBtn" onclick="switchTab('admin')" class="hidden mt-6 w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 flex items-center text-amber-400 border border-amber-400/20 hover:bg-amber-400/10 group">
+                    <div class="w-9 h-9 rounded-lg bg-amber-400/10 flex items-center justify-center mr-3 group-hover:bg-amber-400 group-hover:text-slate-900 transition">
+                        <i class="fas fa-crown text-sm"></i>
+                    </div>
+                    <span class="font-bold text-sm">Admin Console</span>
+                </button>
+            </nav>
+
+            <!-- User Status & Logout -->
+            <div class="p-5 border-t border-slate-800 bg-slate-900/90 backdrop-blur z-10">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center font-bold text-white shadow-md">
+                            <span id="userInitial">A</span>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-bold text-white leading-tight" id="displayUsername">Admin</p>
+                            <div class="flex items-center gap-1.5 mt-0.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <p class="text-xs text-slate-400 font-medium" id="displayRole">Administrator</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="logout()" class="w-full flex items-center justify-center gap-2 bg-rose-500/15 text-rose-300 hover:bg-rose-500 hover:text-white py-2.5 rounded-xl text-xs font-bold transition duration-200">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden relative bg-slate-50">
+            <!-- Background Top Glow -->
+            <div class="absolute top-0 left-0 w-full h-56 bg-gradient-to-b from-indigo-100/60 to-transparent pointer-events-none"></div>
+
+            <!-- Top Header (Responsive for Mobile & Desktop) -->
+            <header class="px-4 sm:px-8 py-3.5 sm:py-5 flex justify-between items-center z-10 border-b border-slate-200/60 bg-white/80 backdrop-blur-md flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <!-- Hamburger Menu Button on Mobile -->
+                    <button onclick="toggleMobileDrawer(true)" class="md:hidden w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center active:scale-95 transition">
+                        <i class="fas fa-bars text-lg"></i>
+                    </button>
+                    <div>
+                        <h2 id="pageTitle" class="text-lg sm:text-2xl font-black text-slate-800 tracking-tight leading-tight">Overview & Analytics</h2>
+                        <p id="pageSubtitle" class="hidden sm:block text-xs sm:text-sm text-slate-500 font-medium">Real-time summary of your finances, cash flow, and assets.</p>
+                    </div>
+                </div>
+
+                <!-- Month Picker & Mobile Profile -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex items-center bg-white px-2.5 sm:px-3 py-1.5 rounded-xl shadow-sm border border-slate-200/80">
+                        <div class="bg-indigo-100 text-indigo-700 p-1.5 sm:p-2 rounded-lg mr-1.5 sm:mr-2 text-xs">
+                            <i class="far fa-calendar-alt"></i>
+                        </div>
+                        <div>
+                            <span class="hidden sm:block text-[10px] uppercase font-bold text-slate-400 leading-none">Filter Month</span>
+                            <input type="month" id="globalMonthPicker" class="bg-transparent border-none text-slate-800 font-bold focus:outline-none cursor-pointer text-xs" onchange="refreshDashboard()">
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Scrollable Tab Content Container -->
+            <div class="flex-1 overflow-y-auto p-4 sm:p-8 relative pb-24 md:pb-8 scroll-smooth">
+                
+                <!-- TAB 1: ANALYTICS -->
+                <div id="tab-analytics" class="tab-content space-y-6 sm:space-y-8">
+                    <!-- Stat Cards -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
+                        <!-- Total Income -->
+                        <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 hover-lift relative overflow-hidden">
+                            <div class="absolute right-0 top-0 w-20 h-20 bg-emerald-50 rounded-bl-full -mr-4 -mt-4 pointer-events-none"></div>
+                            <p class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider relative z-10">Total Income</p>
+                            <h3 class="text-xl sm:text-3xl font-extrabold text-slate-800 mt-1 sm:mt-2 relative z-10" id="statIncome">₹0</h3>
+                            <div class="mt-3 flex items-center text-emerald-600 text-[10px] sm:text-xs font-bold gap-1">
+                                <span class="bg-emerald-100 p-1 rounded"><i class="fas fa-arrow-up"></i></span>
+                                <span class="text-slate-500 font-normal">Monthly Inflow</span>
+                            </div>
+                        </div>
+
+                        <!-- Total Expense -->
+                        <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 hover-lift relative overflow-hidden">
+                            <div class="absolute right-0 top-0 w-20 h-20 bg-rose-50 rounded-bl-full -mr-4 -mt-4 pointer-events-none"></div>
+                            <p class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider relative z-10">Total Expenses</p>
+                            <h3 class="text-xl sm:text-3xl font-extrabold text-slate-800 mt-1 sm:mt-2 relative z-10" id="statExpense">₹0</h3>
+                            <div class="mt-3 flex items-center text-rose-600 text-[10px] sm:text-xs font-bold gap-1">
+                                <span class="bg-rose-100 p-1 rounded"><i class="fas fa-arrow-down"></i></span>
+                                <span class="text-slate-500 font-normal">Monthly Outflow</span>
+                            </div>
+                        </div>
+
+                        <!-- Net Savings -->
+                        <div class="bg-gradient-to-br from-indigo-600 via-indigo-700 to-blue-700 p-4 sm:p-6 rounded-2xl shadow-lg shadow-indigo-500/20 hover-lift text-white">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-indigo-200 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Net Savings</p>
+                                    <h3 class="text-xl sm:text-3xl font-extrabold mt-1 sm:mt-2" id="statSavings">₹0</h3>
+                                </div>
+                                <div class="bg-white/20 p-2 sm:p-2.5 rounded-xl backdrop-blur-sm hidden sm:block">
+                                    <i class="fas fa-piggy-bank text-lg sm:text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="mt-3 text-[10px] sm:text-xs text-indigo-200 font-medium">(Income − Expenses)</p>
+                        </div>
+
+                        <!-- Portfolio Value -->
+                        <div class="bg-gradient-to-br from-purple-600 via-purple-700 to-pink-600 p-4 sm:p-6 rounded-2xl shadow-lg shadow-purple-500/20 hover-lift text-white">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-purple-200 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Portfolio Assets</p>
+                                    <h3 class="text-xl sm:text-3xl font-extrabold mt-1 sm:mt-2" id="statInvest">₹0</h3>
+                                </div>
+                                <div class="bg-white/20 p-2 sm:p-2.5 rounded-xl backdrop-blur-sm hidden sm:block">
+                                    <i class="fas fa-chart-pie text-lg sm:text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="mt-3 text-[10px] sm:text-xs text-purple-200 font-medium">All monitored assets</p>
+                        </div>
+                    </div>
+
+                    <!-- Charts Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+                        <!-- Bar Chart -->
+                        <div class="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
+                            <div class="flex justify-between items-center mb-4 sm:mb-6">
+                                <h3 class="font-extrabold text-slate-800 text-base sm:text-lg flex items-center">
+                                    <span class="w-2.5 h-6 bg-indigo-500 rounded-full mr-3"></span> Cash Flow Comparison
+                                </h3>
+                                <span class="text-xs text-slate-400 font-medium">This Month</span>
+                            </div>
+                            <div class="h-60 sm:h-64 relative">
+                                <canvas id="chartCashFlow"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Doughnut Chart -->
+                        <div class="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
+                            <div class="flex justify-between items-center mb-4 sm:mb-6">
+                                <h3 class="font-extrabold text-slate-800 text-base sm:text-lg flex items-center">
+                                    <span class="w-2.5 h-6 bg-pink-500 rounded-full mr-3"></span> Spending by Category
+                                </h3>
+                                <span class="text-xs text-slate-400 font-medium">Expense Breakdown</span>
+                            </div>
+                            <div class="h-60 sm:h-64 flex justify-center items-center relative">
+                                <canvas id="chartCategories"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: TRANSACTIONS & CASH FLOW -->
+                <div id="tab-salary" class="tab-content hidden space-y-6 sm:space-y-8">
+                    <!-- Transaction Form -->
+                    <div class="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
+                        <div class="flex flex-wrap justify-between items-center gap-3 mb-5">
+                            <div>
+                                <h3 class="text-lg sm:text-xl font-extrabold text-slate-800">Add New Entry</h3>
+                                <p class="text-xs text-slate-500">Record your income inflow or expense outflow.</p>
+                            </div>
+                            <button onclick="exportToExcel('monthly')" class="bg-white text-emerald-600 border border-emerald-300 hover:bg-emerald-50 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center shadow-sm active:scale-95">
+                                <i class="fas fa-file-excel mr-1.5 text-emerald-500"></i> Export Month (.xlsx)
+                            </button>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 sm:gap-4">
+                            <div class="sm:col-span-1 md:col-span-1">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Type</label>
+                                <select id="txnType" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 focus:ring-0 outline-none text-slate-700 font-bold bg-white text-base sm:text-sm">
+                                    <option value="Income">🟢 Income</option>
+                                    <option value="Expense">🔴 Expense</option>
+                                </select>
+                            </div>
+                            <div class="sm:col-span-1 md:col-span-1">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Date</label>
+                                <input type="date" id="txnDate" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-slate-700 text-base sm:text-sm font-semibold">
+                            </div>
+                            <div class="sm:col-span-2 md:col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Description</label>
+                                <input type="text" id="txnDesc" placeholder="e.g. Salary, Groceries, Client Work" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-slate-700 text-base sm:text-sm">
+                            </div>
+                            <div class="sm:col-span-1 md:col-span-1">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Category</label>
+                                <input type="text" id="txnCategory" placeholder="e.g. Salary, Food" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-slate-700 text-base sm:text-sm">
+                            </div>
+                            <div class="sm:col-span-1 md:col-span-1">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Amount (₹)</label>
+                                <input type="number" id="txnAmount" placeholder="Amount" min="0" step="any" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-slate-700 text-base sm:text-sm font-semibold">
+                            </div>
+                        </div>
+                        <button onclick="addTransaction()" class="mt-4 sm:mt-5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 active:scale-[0.99]">
+                            <i class="fas fa-plus"></i> Save Transaction Entry
+                        </button>
+                    </div>
+
+                    <!-- Split Tables -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+                        
+                        <!-- Income Table -->
+                        <div class="bg-white rounded-3xl shadow-sm border border-emerald-200 overflow-hidden">
+                            <div class="p-4 sm:p-5 header-income flex justify-between items-center">
+                                <h3 class="font-bold text-sm sm:text-base flex items-center gap-2">
+                                    <i class="fas fa-arrow-up"></i> Income & Earnings
+                                </h3>
+                                <span class="bg-white/20 text-white px-2.5 py-0.5 rounded-full text-xs font-bold" id="incomeCountBadge">0 entries</span>
+                            </div>
+                            <div class="overflow-x-auto max-h-80 sm:max-h-96 overflow-y-auto">
+                                <table class="w-full text-left">
+                                    <thead class="bg-emerald-50/80 text-emerald-900 uppercase text-[10px] sm:text-xs tracking-wider sticky top-0">
+                                        <tr>
+                                            <th class="py-2.5 px-3 sm:px-4">Date</th>
+                                            <th class="py-2.5 px-3 sm:px-4">Source & Category</th>
+                                            <th class="py-2.5 px-3 sm:px-4 text-right">Amount</th>
+                                            <th class="py-2.5 px-3 sm:px-4 text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="incomeTableBody" class="text-xs sm:text-sm font-medium text-slate-600 divide-y divide-emerald-50"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Expense Table -->
+                        <div class="bg-white rounded-3xl shadow-sm border border-rose-200 overflow-hidden">
+                            <div class="p-4 sm:p-5 header-expense flex justify-between items-center">
+                                <h3 class="font-bold text-sm sm:text-base flex items-center gap-2">
+                                    <i class="fas fa-arrow-down"></i> Expenses & Outflows
+                                </h3>
+                                <span class="bg-white/20 text-white px-2.5 py-0.5 rounded-full text-xs font-bold" id="expenseCountBadge">0 entries</span>
+                            </div>
+                            <div class="overflow-x-auto max-h-80 sm:max-h-96 overflow-y-auto">
+                                <table class="w-full text-left">
+                                    <thead class="bg-rose-50/80 text-rose-900 uppercase text-[10px] sm:text-xs tracking-wider sticky top-0">
+                                        <tr>
+                                            <th class="py-2.5 px-3 sm:px-4">Date</th>
+                                            <th class="py-2.5 px-3 sm:px-4">Item & Category</th>
+                                            <th class="py-2.5 px-3 sm:px-4 text-right">Amount</th>
+                                            <th class="py-2.5 px-3 sm:px-4 text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expenseTableBody" class="text-xs sm:text-sm font-medium text-slate-600 divide-y divide-rose-50"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- TAB 3: INVESTMENTS & PORTFOLIO -->
+                <div id="tab-investments" class="tab-content hidden space-y-6 sm:space-y-8">
+                    <!-- Portfolio Hero Header -->
+                    <div class="bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 rounded-3xl p-5 sm:p-8 text-white shadow-xl shadow-fuchsia-500/20 relative overflow-hidden">
+                        <div class="absolute -right-10 -bottom-20 w-72 h-72 bg-white opacity-10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center relative z-10 gap-3">
+                            <div>
+                                <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight mb-1">Investment Portfolio</h2>
+                                <p class="text-violet-100 opacity-90 text-xs sm:text-sm">Asset tracking, valuation, profit/loss, and ROI metrics.</p>
+                            </div>
+                            <button onclick="exportToExcel('portfolio')" class="bg-white/20 backdrop-blur hover:bg-white hover:text-fuchsia-700 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl font-bold transition border border-white/30 text-xs sm:text-sm flex items-center gap-2 active:scale-95">
+                                <i class="fas fa-download"></i> Export Portfolio (.xlsx)
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 mt-6 sm:mt-8 border-t border-white/20 pt-5 relative z-10">
+                            <div class="bg-white/10 p-3.5 sm:p-4 rounded-2xl backdrop-blur-sm">
+                                <p class="text-[10px] sm:text-xs uppercase tracking-widest text-violet-200 font-semibold">Total Cost Basis</p>
+                                <p class="text-xl sm:text-3xl font-black mt-1" id="invTotalInvested">₹0</p>
+                            </div>
+                            <div class="bg-white/10 p-3.5 sm:p-4 rounded-2xl backdrop-blur-sm">
+                                <p class="text-[10px] sm:text-xs uppercase tracking-widest text-violet-200 font-semibold">Current Value</p>
+                                <p class="text-xl sm:text-3xl font-black mt-1 text-amber-300" id="invTotalCurrent">₹0</p>
+                            </div>
+                            <div class="bg-white/10 p-3.5 sm:p-4 rounded-2xl backdrop-blur-sm">
+                                <p class="text-[10px] sm:text-xs uppercase tracking-widest text-violet-200 font-semibold">Overall Returns</p>
+                                <p class="text-xl sm:text-3xl font-black mt-1" id="invTotalReturn">₹0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add Asset Form -->
+                    <div class="bg-white p-5 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
+                        <h3 class="text-lg sm:text-xl font-extrabold text-slate-800 mb-3 sm:mb-4">Track New Asset</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Asset Name</label>
+                                <input type="text" id="invName" placeholder="e.g. S&P 500, Gold, Bitcoin" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-fuchsia-500 outline-none text-base sm:text-sm text-slate-700 font-semibold">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Invested (₹)</label>
+                                <input type="number" id="invInvested" placeholder="Cost basis" min="0" step="any" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-fuchsia-500 outline-none text-base sm:text-sm text-slate-700 font-semibold">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Current Value (₹)</label>
+                                <input type="number" id="invCurrent" placeholder="Market value" min="0" step="any" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-fuchsia-500 outline-none text-base sm:text-sm text-slate-700 font-semibold">
+                            </div>
+                            <div class="flex items-end">
+                                <button onclick="addInvestment()" class="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-fuchsia-500/25 text-sm flex items-center justify-center gap-2 active:scale-[0.99]">
+                                    <i class="fas fa-plus"></i> Add to Portfolio
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Asset Table -->
+                    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] sm:text-xs tracking-wider font-bold border-b border-slate-100">
+                                    <tr>
+                                        <th class="py-3 sm:py-4 px-4 sm:px-6">Asset Name</th>
+                                        <th class="py-3 sm:py-4 px-4 sm:px-6">Invested (₹)</th>
+                                        <th class="py-3 sm:py-4 px-4 sm:px-6">Current (₹)</th>
+                                        <th class="py-3 sm:py-4 px-4 sm:px-6">Profit/Loss</th>
+                                        <th class="py-3 sm:py-4 px-4 sm:px-6">ROI (%)</th>
+                                        <th class="py-3 sm:py-4 px-4 sm:px-6 text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invTableBody" class="text-xs sm:text-sm divide-y divide-slate-100 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: ADMIN CONSOLE -->
+                <div id="tab-admin" class="tab-content hidden space-y-6 sm:space-y-8">
+                    <div class="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl flex flex-wrap justify-between items-center gap-4 border border-slate-800">
+                        <div>
+                            <div class="flex items-center gap-2.5">
+                                <span class="bg-amber-400 text-slate-950 font-bold px-2 py-0.5 rounded text-xs uppercase tracking-wider">Superuser</span>
+                                <h2 class="text-2xl sm:text-3xl font-extrabold">Admin Console</h2>
+                            </div>
+                            <p class="text-slate-400 mt-1 text-xs sm:text-sm">System statistics, user accounts, and complete database backup tools.</p>
+                        </div>
+                        <button onclick="exportAdminDB()" class="bg-amber-400 text-slate-950 px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl font-bold hover:bg-amber-300 transition shadow-lg shadow-amber-400/20 text-xs sm:text-sm flex items-center gap-2 active:scale-95">
+                            <i class="fas fa-database"></i> Backup DB (.xlsx)
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                        <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 text-center hover-lift">
+                            <p class="text-slate-400 font-bold uppercase text-[10px] sm:text-xs tracking-widest">Total Registered Users</p>
+                            <h1 class="text-4xl sm:text-6xl font-black text-indigo-600 mt-2 sm:mt-3" id="adminUserCount">0</h1>
+                            <p class="text-xs text-slate-400 mt-1 sm:mt-2">Active accounts in system</p>
+                        </div>
+                        <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 text-center hover-lift">
+                            <p class="text-slate-400 font-bold uppercase text-[10px] sm:text-xs tracking-widest">Total System Transactions</p>
+                            <h1 class="text-4xl sm:text-6xl font-black text-emerald-600 mt-2 sm:mt-3" id="adminTxnCount">0</h1>
+                            <p class="text-xs text-slate-400 mt-1 sm:mt-2">Across all accounts</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="p-4 sm:p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                            <h3 class="font-extrabold text-slate-800 text-sm sm:text-base">Registered User Accounts</h3>
+                            <span class="text-xs text-slate-400 hidden sm:inline">Stored in persistent browser storage</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-slate-100/70 text-slate-500 uppercase text-[10px] sm:text-xs font-bold">
+                                    <tr>
+                                        <th class="py-3 px-4 sm:px-6">User ID</th>
+                                        <th class="py-3 px-4 sm:px-6">Username</th>
+                                        <th class="py-3 px-4 sm:px-6">Role</th>
+                                        <th class="py-3 px-4 sm:px-6">Credential</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminTableBody" class="text-xs sm:text-sm text-slate-600 divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Mobile Bottom Navigation Bar (Visible only on mobile devices) -->
+            <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 px-2 py-1.5 flex justify-around items-center z-30 shadow-lg">
+                <button onclick="switchTab('analytics')" id="mob-nav-analytics" class="flex flex-col items-center py-1 px-3 rounded-xl text-indigo-600 font-bold transition">
+                    <i class="fas fa-chart-line text-lg mb-0.5"></i>
+                    <span class="text-[10px]">Analytics</span>
+                </button>
+                <button onclick="switchTab('salary')" id="mob-nav-salary" class="flex flex-col items-center py-1 px-3 rounded-xl text-slate-400 font-medium transition">
+                    <i class="fas fa-exchange-alt text-lg mb-0.5"></i>
+                    <span class="text-[10px]">Flow</span>
+                </button>
+                <button onclick="switchTab('investments')" id="mob-nav-investments" class="flex flex-col items-center py-1 px-3 rounded-xl text-slate-400 font-medium transition">
+                    <i class="fas fa-rocket text-lg mb-0.5"></i>
+                    <span class="text-[10px]">Invest</span>
+                </button>
+                <button id="mobAdminBtn" onclick="switchTab('admin')" class="hidden flex flex-col items-center py-1 px-3 rounded-xl text-amber-500 font-medium transition">
+                    <i class="fas fa-crown text-lg mb-0.5"></i>
+                    <span class="text-[10px]">Admin</span>
+                </button>
+                <button onclick="logout()" class="flex flex-col items-center py-1 px-3 rounded-xl text-rose-500 font-medium transition">
+                    <i class="fas fa-sign-out-alt text-lg mb-0.5"></i>
+                    <span class="text-[10px]">Exit</span>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // --- DATA STORE KEYS ---
+        const KEYS = { USERS: 'ft_users_v3', TXNS: 'ft_txns_v3', INVS: 'ft_invs_v3' };
+        
+        // --- GLOBAL STATE ---
+        let currentUser = null;
+        let chartInstances = {};
+
+        // --- MOBILE DRAWER TOGGLE ---
+        function toggleMobileDrawer(open) {
+            const drawer = document.getElementById('mobileDrawer');
+            const backdrop = document.getElementById('mobileDrawerBackdrop');
+            if(open) {
+                drawer.classList.remove('-translate-x-full');
+                backdrop.classList.remove('hidden');
+            } else {
+                drawer.classList.add('-translate-x-full');
+                backdrop.classList.add('hidden');
+            }
+        }
+
+        // --- TOAST NOTIFICATION HELPER ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const colorMap = {
+                success: 'bg-emerald-600 text-white shadow-emerald-500/30',
+                error: 'bg-rose-600 text-white shadow-rose-500/30',
+                info: 'bg-indigo-600 text-white shadow-indigo-500/30'
+            };
+            const iconMap = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                info: 'fa-info-circle'
+            };
+
+            toast.className = `toast-item flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-xs sm:text-sm font-semibold ${colorMap[type] || colorMap.info}`;
+            toast.innerHTML = `<i class="fas ${iconMap[type] || iconMap.info}"></i> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 350);
+            }, 3000);
+        }
+
+        // --- DEMO SEED DATA INITIALIZATION ---
+        function initializeData() {
+            // Seed Admin User
+            const storedUsers = JSON.parse(localStorage.getItem(KEYS.USERS)) || [];
+            if(!storedUsers.some(u => u.username === 'admin')) {
+                storedUsers.push({ id: 1, username: 'admin', password: 'admin123', role: 'admin' });
+                localStorage.setItem(KEYS.USERS, JSON.stringify(storedUsers));
+            }
+
+            // Seed Sample Transactions if empty
+            const existingTxns = JSON.parse(localStorage.getItem(KEYS.TXNS));
+            const now = new Date();
+            const year = now.getFullYear();
+            const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+            const curMonth = `${year}-${monthStr}`;
+
+            if(!existingTxns || existingTxns.length === 0) {
+                const sampleTxns = [
+                    { id: 101, userId: 1, type: 'Income', desc: 'Primary Tech Salary', category: 'Salary', amount: 85000, date: `${curMonth}-01` },
+                    { id: 102, userId: 1, type: 'Income', desc: 'Consulting Project', category: 'Freelance', amount: 24000, date: `${curMonth}-05` },
+                    { id: 103, userId: 1, type: 'Income', desc: 'Quarterly Dividends', category: 'Investments', amount: 4500, date: `${curMonth}-10` },
+                    { id: 104, userId: 1, type: 'Expense', desc: 'Apartment Lease', category: 'Housing', amount: 26000, date: `${curMonth}-02` },
+                    { id: 105, userId: 1, type: 'Expense', desc: 'Gourmet Supermarket', category: 'Groceries', amount: 7800, date: `${curMonth}-04` },
+                    { id: 106, userId: 1, type: 'Expense', desc: 'High-speed Fiber & Cloud', category: 'Utilities', amount: 2800, date: `${curMonth}-06` },
+                    { id: 107, userId: 1, type: 'Expense', desc: 'Dining & Weekend Socials', category: 'Lifestyle', amount: 5600, date: `${curMonth}-08` },
+                    { id: 108, userId: 1, type: 'Expense', desc: 'Tech Hardware & Displays', category: 'Electronics', amount: 12500, date: `${curMonth}-11` }
+                ];
+                localStorage.setItem(KEYS.TXNS, JSON.stringify(sampleTxns));
+            }
+
+            // Seed Sample Investments if empty
+            const existingInvs = JSON.parse(localStorage.getItem(KEYS.INVS));
+            if(!existingInvs || existingInvs.length === 0) {
+                const sampleInvs = [
+                    { id: 201, userId: 1, name: 'S&P 500 Index Fund', invested: 150000, current: 182500 },
+                    { id: 202, userId: 1, name: 'Bluechip Tech Equity', invested: 80000, current: 97400 },
+                    { id: 203, userId: 1, name: 'Sovereign Gold Bonds', invested: 45000, current: 52000 }
+                ];
+                localStorage.setItem(KEYS.INVS, JSON.stringify(sampleInvs));
+            }
+
+            // Set Date Defaults
+            document.getElementById('globalMonthPicker').value = curMonth;
+            document.getElementById('txnDate').value = now.toISOString().split('T')[0];
+        }
+
+        initializeData();
+
+        // --- AUTHENTICATION ---
+        function toggleAuth(type) {
+            document.getElementById('loginForm').classList.toggle('hidden', type === 'register');
+            document.getElementById('registerForm').classList.toggle('hidden', type !== 'register');
+        }
+
+        function quickFillAdmin() {
+            document.getElementById('loginUser').value = 'admin';
+            document.getElementById('loginPass').value = 'admin123';
+            showToast('Loaded demo admin credentials', 'info');
+        }
+
+        function handleRegister() {
+            const u = document.getElementById('regUser').value.trim();
+            const p = document.getElementById('regPass').value.trim();
+            if(!u || !p) return showToast("Please fill all registration fields", 'error');
+            
+            const users = JSON.parse(localStorage.getItem(KEYS.USERS)) || [];
+            if(users.some(user => user.username.toLowerCase() === u.toLowerCase())) {
+                return showToast("Username already exists! Choose another.", 'error');
+            }
+
+            const newUser = { id: Date.now(), username: u, password: p, role: 'client' };
+            users.push(newUser);
+            localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+            showToast("Account created successfully! Please log in.", 'success');
+            document.getElementById('regUser').value = '';
+            document.getElementById('regPass').value = '';
+            toggleAuth('login');
+        }
+
+        function handleLogin() {
+            const u = document.getElementById('loginUser').value.trim();
+            const p = document.getElementById('loginPass').value.trim();
+            const users = JSON.parse(localStorage.getItem(KEYS.USERS)) || [];
+            
+            const found = users.find(user => user.username === u && user.password === p);
+            if(found) {
+                currentUser = found;
+                document.getElementById('authSection').classList.add('hidden');
+                document.getElementById('dashboardSection').classList.remove('hidden');
+                
+                document.getElementById('displayUsername').innerText = currentUser.username;
+                document.getElementById('displayRole').innerText = currentUser.role === 'admin' ? 'Administrator' : 'Client Member';
+                document.getElementById('userInitial').innerText = currentUser.username.charAt(0).toUpperCase();
+
+                if(currentUser.role === 'admin') {
+                    document.getElementById('adminBtn').classList.remove('hidden');
+                    document.getElementById('mobAdminBtn').classList.remove('hidden');
+                } else {
+                    document.getElementById('adminBtn').classList.add('hidden');
+                    document.getElementById('mobAdminBtn').classList.add('hidden');
+                }
+
+                switchTab('analytics');
+                refreshDashboard();
+                showToast(`Welcome back, ${currentUser.username}!`, 'success');
+            } else {
+                showToast("Invalid credentials. Try admin / admin123", 'error');
+            }
+        }
+
+        function logout() {
+            showToast("Logging out...", 'info');
+            setTimeout(() => location.reload(), 400);
+        }
+
+        // --- DASHBOARD NAVIGATION ---
+        function switchTab(tabId) {
+            // Close mobile drawer if open
+            toggleMobileDrawer(false);
+
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            
+            // Desktop Sidebar updates
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-900/40');
+                el.classList.add('text-slate-300');
+            });
+
+            const activeBtn = document.getElementById(`nav-btn-${tabId}`);
+            if(activeBtn) {
+                activeBtn.classList.remove('text-slate-300');
+                activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-900/40');
+            }
+
+            // Mobile Bottom Nav updates
+            ['analytics', 'salary', 'investments', 'admin'].forEach(t => {
+                const mobBtn = document.getElementById(`mob-nav-${t}`) || (t === 'admin' ? document.getElementById('mobAdminBtn') : null);
+                if(mobBtn) {
+                    if(t === tabId) {
+                        mobBtn.classList.remove('text-slate-400', 'font-medium');
+                        mobBtn.classList.add(t === 'admin' ? 'text-amber-500' : 'text-indigo-600', 'font-bold');
+                    } else {
+                        mobBtn.classList.remove('text-indigo-600', 'text-amber-500', 'font-bold');
+                        mobBtn.classList.add('text-slate-400', 'font-medium');
+                    }
+                }
+            });
+
+            const targetSection = document.getElementById(`tab-${tabId}`);
+            if(targetSection) targetSection.classList.remove('hidden');
+
+            const pageTitleEl = document.getElementById('pageTitle');
+            const pageSubtitleEl = document.getElementById('pageSubtitle');
+
+            if(tabId === 'analytics') {
+                pageTitleEl.innerText = 'Overview & Analytics';
+                pageSubtitleEl.innerText = 'Real-time summary of your finances, cash flow, and assets.';
+            } else if(tabId === 'salary') {
+                pageTitleEl.innerText = 'Transactions & Cash Flow';
+                pageSubtitleEl.innerText = 'Track and categorize all monthly income earnings and expense outflows.';
+            } else if(tabId === 'investments') {
+                pageTitleEl.innerText = 'Investment Portfolio';
+                pageSubtitleEl.innerText = 'Analyze valuation, returns, and performance across your asset portfolio.';
+            } else if(tabId === 'admin') {
+                pageTitleEl.innerText = 'Admin Management Console';
+                pageSubtitleEl.innerText = 'Superuser visibility into user accounts and whole database backups.';
+                refreshAdmin();
+            }
+        }
+
+        // --- CORE LOGIC & REFRESH ---
+        function refreshDashboard() {
+            if(!currentUser) return;
+
+            const selectedMonth = document.getElementById('globalMonthPicker').value;
+            const allTxns = JSON.parse(localStorage.getItem(KEYS.TXNS)) || [];
+            const allInvs = JSON.parse(localStorage.getItem(KEYS.INVS)) || [];
+
+            const userTxns = allTxns.filter(t => t.userId === currentUser.id);
+            const monthlyTxns = userTxns.filter(t => t.date.startsWith(selectedMonth));
+            const userInvs = allInvs.filter(i => i.userId === currentUser.id);
+
+            const income = monthlyTxns.filter(t => t.type === 'Income').reduce((s, t) => s + Number(t.amount || 0), 0);
+            const expense = monthlyTxns.filter(t => t.type === 'Expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+            
+            renderSplitTables(monthlyTxns);
+            renderInvTable(userInvs);
+            updateCharts(income, expense, monthlyTxns);
+
+            document.getElementById('statIncome').innerText = `₹${income.toLocaleString()}`;
+            document.getElementById('statExpense').innerText = `₹${expense.toLocaleString()}`;
+            document.getElementById('statSavings').innerText = `₹${(income - expense).toLocaleString()}`;
+        }
+
+        // --- RENDER SPLIT TABLES ---
+        function renderSplitTables(data) {
+            const incBody = document.getElementById('incomeTableBody');
+            const expBody = document.getElementById('expenseTableBody');
+            incBody.innerHTML = '';
+            expBody.innerHTML = '';
+
+            const incomeItems = data.filter(t => t.type === 'Income');
+            const expenseItems = data.filter(t => t.type === 'Expense');
+
+            document.getElementById('incomeCountBadge').innerText = `${incomeItems.length} entries`;
+            document.getElementById('expenseCountBadge').innerText = `${expenseItems.length} entries`;
+
+            if(incomeItems.length === 0) {
+                incBody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-slate-400 italic text-xs">No income records for this month.</td></tr>`;
+            } else {
+                incomeItems.forEach(t => {
+                    const row = `<tr class="hover:bg-emerald-50/50 transition">
+                        <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-emerald-950 font-mono text-[10px] sm:text-xs whitespace-nowrap">${t.date}</td>
+                        <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-emerald-900 font-semibold leading-tight">${t.desc} <span class="text-[10px] sm:text-xs text-emerald-600 font-normal block">${t.category || 'Income'}</span></td>
+                        <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-bold text-emerald-600 whitespace-nowrap">₹${Number(t.amount).toLocaleString()}</td>
+                        <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-center">
+                            <button onclick="deleteTxn(${t.id})" class="text-slate-400 hover:text-rose-500 transition p-1"><i class="fas fa-trash-alt text-xs"></i></button>
+                        </td>
+                    </tr>`;
+                    incBody.innerHTML += row;
+                });
+            }
+
+            if(expenseItems.length === 0) {
+                expBody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-slate-400 italic text-xs">No expense records for this month.</td></tr>`;
+            } else {
+                expenseItems.forEach(t => {
+                    const row = `<tr class="hover:bg-rose-50/50 transition">
+                        <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-rose-950 font-mono text-[10px] sm:text-xs whitespace-nowrap">${t.date}</td>
+                        <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-rose-900 font-semibold leading-tight">${t.desc} <span class="text-[10px] sm:text-xs text-rose-500 font-normal block">${t.category || 'Expense'}</span></td>
+                        <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-right font-bold text-rose-600 whitespace-nowrap">₹${Number(t.amount).toLocaleString()}</td>
+                        <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-center">
+                            <button onclick="deleteTxn(${t.id})" class="text-slate-400 hover:text-rose-500 transition p-1"><i class="fas fa-trash-alt text-xs"></i></button>
+                        </td>
+                    </tr>`;
+                    expBody.innerHTML += row;
+                });
+            }
+        }
+
+        // --- RENDER INVESTMENTS TABLE ---
+        function renderInvTable(data) {
+            const tbody = document.getElementById('invTableBody');
+            tbody.innerHTML = '';
+            let totalInv = 0, totalCur = 0;
+
+            if(data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400 italic text-xs sm:text-sm">No assets currently tracked in your portfolio.</td></tr>`;
+            } else {
+                data.forEach(i => {
+                    const invested = parseFloat(i.invested) || 0;
+                    const current = parseFloat(i.current) || 0;
+                    const profit = current - invested;
+                    const roi = invested > 0 ? ((profit / invested) * 100).toFixed(2) : '0.00';
+                    const isProfitable = profit >= 0;
+
+                    totalInv += invested;
+                    totalCur += current;
+
+                    const row = `<tr class="hover:bg-fuchsia-50/40 transition">
+                        <td class="py-3 sm:py-4 px-4 sm:px-6 font-bold text-slate-800">${i.name}</td>
+                        <td class="py-3 sm:py-4 px-4 sm:px-6 font-semibold whitespace-nowrap">₹${invested.toLocaleString()}</td>
+                        <td class="py-3 sm:py-4 px-4 sm:px-6 font-semibold text-purple-950 whitespace-nowrap">₹${current.toLocaleString()}</td>
+                        <td class="py-3 sm:py-4 px-4 sm:px-6 font-bold ${isProfitable ? 'text-emerald-600' : 'text-rose-600'} whitespace-nowrap">
+                            ${isProfitable ? '+' : ''}₹${profit.toLocaleString()}
+                        </td>
+                        <td class="py-3 sm:py-4 px-4 sm:px-6 font-bold ${isProfitable ? 'text-emerald-600' : 'text-rose-600'} whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${isProfitable ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                                ${isProfitable ? '▲' : '▼'} ${roi}%
+                            </span>
+                        </td>
+                        <td class="py-3 sm:py-4 px-4 sm:px-6 text-center">
+                            <button onclick="deleteInv(${i.id})" title="Delete Asset" class="text-slate-400 hover:text-rose-500 p-1 transition"><i class="fas fa-trash-alt text-xs"></i></button>
+                        </td>
+                    </tr>`;
+                    tbody.innerHTML += row;
+                });
+            }
+
+            const totalProfit = totalCur - totalInv;
+            document.getElementById('invTotalInvested').innerText = `₹${totalInv.toLocaleString()}`;
+            document.getElementById('invTotalCurrent').innerText = `₹${totalCur.toLocaleString()}`;
+            document.getElementById('invTotalReturn').innerHTML = `<span class="${totalProfit >= 0 ? 'text-white' : 'text-rose-300'}">${totalProfit >= 0 ? '+' : ''}₹${totalProfit.toLocaleString()}</span>`;
+            document.getElementById('statInvest').innerText = `₹${totalCur.toLocaleString()}`;
+        }
+
+        // --- ACTIONS ---
+        function addTransaction() {
+            const type = document.getElementById('txnType').value;
+            const desc = document.getElementById('txnDesc').value.trim();
+            const cat = document.getElementById('txnCategory').value.trim();
+            const amt = parseFloat(document.getElementById('txnAmount').value);
+            const date = document.getElementById('txnDate').value;
+
+            if(!desc || isNaN(amt) || amt <= 0 || !date) {
+                return showToast("Please fill in a valid description, date, and positive amount.", 'error');
+            }
+
+            const txns = JSON.parse(localStorage.getItem(KEYS.TXNS)) || [];
+            txns.push({ id: Date.now(), userId: currentUser.id, type, desc, category: cat || (type === 'Income' ? 'Salary' : 'General'), amount: amt, date });
+            localStorage.setItem(KEYS.TXNS, JSON.stringify(txns));
+            
+            // Clear input fields
+            document.getElementById('txnDesc').value = '';
+            document.getElementById('txnCategory').value = '';
+            document.getElementById('txnAmount').value = '';
+
+            refreshDashboard();
+            showToast("Transaction saved successfully!", 'success');
+        }
+
+        function deleteTxn(id) {
+            let txns = JSON.parse(localStorage.getItem(KEYS.TXNS)) || [];
+            txns = txns.filter(t => t.id !== id);
+            localStorage.setItem(KEYS.TXNS, JSON.stringify(txns));
+            refreshDashboard();
+            showToast("Transaction deleted", 'info');
+        }
+
+        function addInvestment() {
+            const name = document.getElementById('invName').value.trim();
+            const inv = parseFloat(document.getElementById('invInvested').value);
+            const cur = parseFloat(document.getElementById('invCurrent').value);
+
+            if(!name || isNaN(inv) || inv <= 0 || isNaN(cur) || cur < 0) {
+                return showToast("Please enter a valid asset name, invested cost, and current value.", 'error');
+            }
+            
+            const invs = JSON.parse(localStorage.getItem(KEYS.INVS)) || [];
+            invs.push({ id: Date.now(), userId: currentUser.id, name, invested: inv, current: cur });
+            localStorage.setItem(KEYS.INVS, JSON.stringify(invs));
+            
+            // Clear inputs
+            document.getElementById('invName').value = '';
+            document.getElementById('invInvested').value = '';
+            document.getElementById('invCurrent').value = '';
+
+            refreshDashboard();
+            showToast("Asset added to portfolio!", 'success');
+        }
+
+        function deleteInv(id) {
+            let invs = JSON.parse(localStorage.getItem(KEYS.INVS)) || [];
+            invs = invs.filter(i => i.id !== id);
+            localStorage.setItem(KEYS.INVS, JSON.stringify(invs));
+            refreshDashboard();
+            showToast("Asset removed from portfolio", 'info');
+        }
+
+        // --- CHARTS (CHART.JS) ---
+        function updateCharts(income, expense, data) {
+            const ctx1 = document.getElementById('chartCashFlow').getContext('2d');
+            const ctx2 = document.getElementById('chartCategories').getContext('2d');
+
+            if(chartInstances.cashFlow) chartInstances.cashFlow.destroy();
+            chartInstances.cashFlow = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['Income (Inflow)', 'Expenses (Outflow)'],
+                    datasets: [{
+                        label: 'Amount (₹)',
+                        data: [income, expense],
+                        backgroundColor: ['#10b981', '#f43f5e'],
+                        borderRadius: 10,
+                        barThickness: window.innerWidth < 640 ? 36 : 56
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ₹${Number(ctx.raw).toLocaleString()}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                callback: val => `₹${val.toLocaleString()}`
+                            }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            const cats = {};
+            data.filter(t => t.type === 'Expense').forEach(e => {
+                const category = e.category || 'General';
+                cats[category] = (cats[category] || 0) + Number(e.amount);
+            });
+
+            const catLabels = Object.keys(cats);
+            const catValues = Object.values(cats);
+
+            if(chartInstances.categories) chartInstances.categories.destroy();
+
+            if(catLabels.length === 0) {
+                // Empty state donut
+                chartInstances.categories = new Chart(ctx2, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['No Expenses This Month'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#e2e8f0'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            tooltip: { enabled: false },
+                            legend: { position: 'bottom' }
+                        }
+                    }
+                });
+            } else {
+                chartInstances.categories = new Chart(ctx2, {
+                    type: 'doughnut',
+                    data: {
+                        labels: catLabels,
+                        datasets: [{
+                            data: catValues,
+                            backgroundColor: ['#8b5cf6', '#ec4899', '#f59e0b', '#3b82f6', '#10b981', '#06b6d4', '#6366f1'],
+                            borderWidth: 2,
+                            borderColor: '#ffffff',
+                            hoverOffset: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 11 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ` ${ctx.label}: ₹${Number(ctx.raw).toLocaleString()}`
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // --- ADMIN ---
+        function refreshAdmin() {
+            const users = JSON.parse(localStorage.getItem(KEYS.USERS)) || [];
+            const txns = JSON.parse(localStorage.getItem(KEYS.TXNS)) || [];
+            
+            document.getElementById('adminUserCount').innerText = users.length;
+            document.getElementById('adminTxnCount').innerText = txns.length;
+
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = '';
+            users.forEach(u => {
+                tbody.innerHTML += `<tr>
+                    <td class="py-2.5 sm:py-3 px-4 sm:px-6 text-slate-500 font-mono text-xs">${u.id}</td>
+                    <td class="py-2.5 sm:py-3 px-4 sm:px-6 font-bold text-indigo-700">${u.username}</td>
+                    <td class="py-2.5 sm:py-3 px-4 sm:px-6">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${u.role === 'admin' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}">
+                            ${u.role}
+                        </span>
+                    </td>
+                    <td class="py-2.5 sm:py-3 px-4 sm:px-6 font-mono text-xs text-slate-400">••••••••</td>
+                </tr>`;
+            });
+        }
+
+        // --- EXPORT TO EXCEL ---
+        function exportToExcel(type) {
+            const selectedMonth = document.getElementById('globalMonthPicker').value;
+            let formattedData = [];
+            let fname = "";
+
+            if(type === 'monthly') {
+                const userTxns = (JSON.parse(localStorage.getItem(KEYS.TXNS)) || [])
+                    .filter(t => t.userId === currentUser.id && t.date.startsWith(selectedMonth));
+                
+                if(!userTxns.length) return showToast("No transactions found for this month to export.", 'error');
+
+                formattedData = userTxns.map(t => ({
+                    'Date': t.date,
+                    'Type': t.type,
+                    'Description': t.desc,
+                    'Category': t.category,
+                    'Amount (INR)': t.amount
+                }));
+                fname = `FinTrack_${selectedMonth}_Report.xlsx`;
+            } else if(type === 'portfolio') {
+                const userInvs = (JSON.parse(localStorage.getItem(KEYS.INVS)) || [])
+                    .filter(i => i.userId === currentUser.id);
+
+                if(!userInvs.length) return showToast("No investment portfolio assets to export.", 'error');
+
+                formattedData = userInvs.map(i => {
+                    const profit = Number(i.current) - Number(i.invested);
+                    const roi = Number(i.invested) > 0 ? ((profit / Number(i.invested)) * 100).toFixed(2) + '%' : '0%';
+                    return {
+                        'Asset Name': i.name,
+                        'Invested Cost (INR)': i.invested,
+                        'Current Value (INR)': i.current,
+                        'Profit / Loss (INR)': profit,
+                        'ROI': roi
+                    };
+                });
+                fname = `FinTrack_Portfolio_${new Date().toISOString().split('T')[0]}.xlsx`;
+            }
+
+            const ws = XLSX.utils.json_to_sheet(formattedData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "FinTrack Data");
+            XLSX.writeFile(wb, fname);
+            showToast(`Exported ${fname}!`, 'success');
+        }
+        
+        function exportAdminDB() {
+            const users = JSON.parse(localStorage.getItem(KEYS.USERS)) || [];
+            const txns = JSON.parse(localStorage.getItem(KEYS.TXNS)) || [];
+            const invs = JSON.parse(localStorage.getItem(KEYS.INVS)) || [];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(users), "Users");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txns), "Transactions");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(invs), "Investments");
+            
+            XLSX.writeFile(wb, "FinTrack_Full_Database_Backup.xlsx");
+            showToast("Full database backup downloaded!", 'success');
+        }
+    </script>
+</body>
+</html>
